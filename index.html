@@ -11,13 +11,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.0.1/highlight.min.js"></script>
     <!-- and it's easy to individually load additional languages -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.0.1/languages/json.min.js"></script>
-    <script>
+<!--     <script>
         hljs.addPlugin(
           new CopyButtonPlugin({
             autohide: false
           })
         );
-    </script>
+    </script> -->
 </head>
 <body>
 
@@ -37,6 +37,52 @@
     <script type="module">
         import { default as HyperFormula } from "./hyperformula.2.7.1.esm.min.js";
 
+        function getCellValue(HyperFormulaLibrary, row, col, fields) {
+            // return `$this->${fields.filter(field => field.commentForName == `${address(HyperFormulaLibrary, row, col)}`)[0].name}`;
+            return `[${row}, ${col}]`
+        }
+
+        /*
+        {
+            "type": "ERROR_WITH_RAW_INPUT",
+            "error": {
+                "type": "REF"
+            },
+            "rawInput": "Sheet14!A1"
+        }
+        */
+        
+        function generateCode(HyperFormulaLibrary, ast, fields) {
+            switch (ast.type) {
+                case 'DIV_OP':
+                    return `${generateCode(HyperFormulaLibrary, ast.left, fields)} / ${generateCode(HyperFormulaLibrary, ast.right, fields)}`;
+                case 'TIMES_OP':
+                    return `${generateCode(HyperFormulaLibrary, ast.left, fields)} * ${generateCode(HyperFormulaLibrary, ast.right, fields)}`;
+                case 'PLUS_OP':
+                    return `${generateCode(HyperFormulaLibrary, ast.left, fields)} + ${generateCode(HyperFormulaLibrary, ast.right, fields)}`;
+                case 'MINUS_OP':
+                    return `${generateCode(HyperFormulaLibrary, ast.left, fields)} - ${generateCode(HyperFormulaLibrary, ast.right, fields)}`;
+                case 'CELL_REFERENCE':
+                    return getCellValue(HyperFormulaLibrary, ast.reference.row, ast.reference.col, fields); // Assumes a function getCellValue(row, col)
+                case 'NUMBER':
+                    return ast.value.toString();
+                case 'FUNCTION_CALL':
+                    if ast.procedureName == "IF" {
+                        return  `if (${generateCode(HyperFormulaLibrary, ast.args[0], fields)}) {  
+                                return ${generateCode(HyperFormulaLibrary, ast.args[1], fields) } 
+                            } else { 
+                                ${generateCode(HyperFormulaLibrary, ast.args[2], fields) }
+                            }`;
+                    }
+                case 'PARENTHESES':
+                    return `(${generateCode(HyperFormulaLibrary, ast.expression, fields)})`;
+                case 'ERROR_WITH_RAW_INPUT':
+                    return ast.rawInput;
+                default:
+                    throw new Error(`Unknown AST node type: ${ast.type}`);
+            }
+        }
+        
         document
         .getElementById("formula-input")
         .addEventListener("input", function (e) {
